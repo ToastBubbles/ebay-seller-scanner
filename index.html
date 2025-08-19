@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Ebay Scanner</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <h1>eBay Seller Scanner</h1>
+    <form id="sellerForm">
+      <input
+        type="text"
+        id="sellerInput"
+        placeholder="Enter seller username"
+        required
+      />
+      <button type="submit">Add Seller</button>
+    </form>
+    <h2>Tracked Sellers</h2>
+    <ul id="sellerList"></ul>
+
+    <h2>Settings</h2>
+
+    <!-- Scan interval -->
+    <div>
+      <label for="scanIntervalInput">Scan Interval (seconds): </label>
+      <input type="number" id="scanIntervalInput" min="10" />
+      <button id="setIntervalBtn">Set Interval</button>
+    </div>
+    <!-- Clear seen items -->
+    <button id="clearSeenBtn">Clear Seen Items</button>
+    <script src="renderer.js"></script>
+  </body>
+</html>
