@@ -1,11 +1,14 @@
-const { app, BrowserWindow, ipcMain, Notification } = require('electron');
+const { app, BrowserWindow, ipcMain, Notification, Tray, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const axios = require('axios');
+const AutoLaunch = require('auto-launch');
 
 let win;
-const CONFIG_FILE = path.join(__dirname, 'config.json');
-const SEEN_FILE = path.join(__dirname, 'seenItems.json');
+// const CONFIG_FILE = path.join(__dirname, 'config.json');
+// const SEEN_FILE = path.join(__dirname, 'seenItems.json');
+const CONFIG_FILE = path.join(app.getPath('userData'), 'config.json');
+const SEEN_FILE = path.join(app.getPath('userData'), 'seenItems.json');
 let seenItems = new Set();
 let errorNotified = false;
 let scanIntervalTimer;
@@ -31,14 +34,23 @@ function createWindow() {
   win = new BrowserWindow({
     width: 800,
     height: 600,
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js')
     },
-    icon:'images/icon.ico'
+    icon: 'images/icon.png'
   });
 
 
   win.loadFile('index.html');
+
+  win.on('close', (event) => {
+    if (!app.isQuitting) {
+      event.preventDefault();
+      win.hide();
+    }
+    return false;
+  });
 }
 
 async function getAccessToken() {
@@ -56,6 +68,8 @@ async function getAccessToken() {
 
   try {
     const auth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+    console.log(auth);
+
     const params = new URLSearchParams();
     params.append('grant_type', 'client_credentials');
     params.append('scope', 'https://api.ebay.com/oauth/api_scope');
@@ -154,10 +168,10 @@ async function checkSellers() {
 
   // Get the current seller to scan
   const seller = sellers[currentSellerIndex];
-  new Notification({
-    title: 'eBay Scanner',
-    body: `Scanning seller ${seller} for new listings...`
-  }).show();
+  // new Notification({
+  //   title: 'eBay Scanner',
+  //   body: `Scanning seller ${seller} for new listings...`
+  // }).show();
 
   try {
     callCounter++;
@@ -241,6 +255,31 @@ ipcMain.handle('set-scan-interval', async (_, sec) => {
 app.whenReady().then(() => {
   createWindow();
 
+  // Create system tray
+  tray = new Tray(path.join(__dirname, 'images/icon.png')); // Use same icon
+  const contextMenu = Menu.buildFromTemplate([
+    { label: 'Show eBay Scanner', click: () => win.show() },
+    { label: 'Quit', click: () => { app.isQuitting = true; app.quit(); } }
+  ]);
+  tray.setToolTip('eBay Scanner');
+  tray.setContextMenu(contextMenu);
+  tray.on('click', () => win.show()); // Show window on tray click
+
+  // Enable auto-launch
+  const autoLaunch = new AutoLaunch({
+    name: 'eBay Scanner',
+    path: app.getPath('exe'),
+    isHidden: true // Start minimized to tray
+  });
+  autoLaunch.enable();
+
+  // Check if started hidden
+  if (process.argv.includes('--hidden')) {
+    win.hide();
+  } else {
+    win.show();
+  }
+
   const config = readConfig();
   const sellers = Array.isArray(config.sellers) ? config.sellers : [];
   const intervalSec = !isNaN(config.scanIntervalInSeconds) ? config.scanIntervalInSeconds : defaultInterval;
@@ -251,6 +290,10 @@ app.whenReady().then(() => {
   }).show();
 
   startScanInterval(intervalSec);
+});
+
+app.on('before-quit', () => {
+  app.isQuitting = true; // Ensure proper quit
 });
 
 app.on('window-all-closed', () => {
